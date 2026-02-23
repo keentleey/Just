@@ -1,0 +1,1729 @@
+import React, { useState, useMemo, useCallback } from ‘react’;
+
+// ─── CONSTANTS ────────────────────────────────────────────────────────────────
+
+const ADMIN_ID = ‘ADMIN’;
+const APPROVAL_PW = ‘justrt2024’;
+
+const DEPT_COLORS = {
+cashier:      ‘#1A3A6B’,
+groceries:    ‘#16A34A’,
+drinks:       ‘#2563EB’,
+toiletries:   ‘#9333EA’,
+household:    ‘#EA580C’,
+electronics:  ‘#0891B2’,
+backstore:    ‘#64748B’,
+merchandisers:’#B45309’,
+};
+
+const DEPT_INIT = [
+{ id: ‘cashier’,       name: ‘Cashier’,       quota: 14, color: DEPT_COLORS.cashier },
+{ id: ‘groceries’,     name: ‘Groceries’,      quota: 5,  color: DEPT_COLORS.groceries },
+{ id: ‘drinks’,        name: ‘Drinks’,         quota: 4,  color: DEPT_COLORS.drinks },
+{ id: ‘toiletries’,    name: ‘Toiletries’,     quota: 2,  color: DEPT_COLORS.toiletries },
+{ id: ‘household’,     name: ‘Household’,      quota: 2,  color: DEPT_COLORS.household },
+{ id: ‘electronics’,   name: ‘Electronics’,    quota: 2,  color: DEPT_COLORS.electronics },
+{ id: ‘backstore’,     name: ‘Backstore’,      quota: 2,  color: DEPT_COLORS.backstore },
+{ id: ‘merchandisers’, name: ‘Merchandisers’,  quota: 19, color: DEPT_COLORS.merchandisers },
+];
+
+const SHIFTS = {
+morning:  { label: ‘Morning’,   short: ‘MOR’, time: ‘7:30AM–3:00PM’,  bg: ‘#DBEAFE’, fg: ‘#1D4ED8’ },
+afternoon:{ label: ‘Afternoon’, short: ‘AFT’, time: ‘1:30PM–9:00PM’,  bg: ‘#EDE9FE’, fg: ‘#7C3AED’ },
+sunday:   { label: ‘Sunday’,    short: ‘SUN’, time: ‘9:30AM–9:30PM’,  bg: ‘#FEF3C7’, fg: ‘#D97706’ },
+longhour: { label: ‘Long Hour’, short: ‘LNG’, time: ‘10AM–10PM’,      bg: ‘#FCE7F3’, fg: ‘#BE185D’ },
+off:      { label: ‘Off’,       short: ‘OFF’, time: ‘Rest Day’,        bg: ‘#F1F5F9’, fg: ‘#64748B’ },
+};
+
+const STAFF_INIT = [
+{ id:‘EMP001’, name:‘Adebayo Oluwaseun’,  dept:‘cashier’,       shift:‘morning’,   role:‘staff’,      active:true, supOf:[] },
+{ id:‘EMP002’, name:‘Chioma Nwachukwu’,   dept:‘cashier’,       shift:‘morning’,   role:‘staff’,      active:true, supOf:[] },
+{ id:‘EMP003’, name:‘Funmilayo Adesanya’, dept:‘cashier’,       shift:‘afternoon’, role:‘supervisor’, active:true, supOf:[‘cashier’,‘groceries’] },
+{ id:‘EMP004’, name:‘Emeka Okonkwo’,      dept:‘cashier’,       shift:‘afternoon’, role:‘staff’,      active:true, supOf:[] },
+{ id:‘EMP005’, name:‘Blessing Eze’,       dept:‘groceries’,     shift:‘morning’,   role:‘staff’,      active:true, supOf:[] },
+{ id:‘EMP006’, name:‘Tunde Bakare’,       dept:‘groceries’,     shift:‘afternoon’, role:‘staff’,      active:true, supOf:[] },
+{ id:‘EMP007’, name:‘Ngozi Obi’,          dept:‘drinks’,        shift:‘morning’,   role:‘staff’,      active:true, supOf:[] },
+{ id:‘EMP008’, name:‘Kola Adeleke’,       dept:‘drinks’,        shift:‘afternoon’, role:‘staff’,      active:true, supOf:[] },
+{ id:‘EMP009’, name:‘Amaka Ihejirika’,    dept:‘toiletries’,    shift:‘morning’,   role:‘staff’,      active:true, supOf:[] },
+{ id:‘EMP010’, name:‘Segun Afolabi’,      dept:‘household’,     shift:‘afternoon’, role:‘staff’,      active:true, supOf:[] },
+{ id:‘EMP011’, name:‘Yetunde Adebisi’,    dept:‘electronics’,   shift:‘morning’,   role:‘staff’,      active:true, supOf:[] },
+{ id:‘EMP012’, name:‘Dayo Ogundimu’,      dept:‘backstore’,     shift:‘afternoon’, role:‘staff’,      active:true, supOf:[] },
+{ id:‘EMP013’, name:‘Ifeanyi Okeke’,      dept:‘merchandisers’, shift:‘morning’,   role:‘staff’,      active:true, supOf:[] },
+{ id:‘EMP014’, name:‘Sade Oluwafemi’,     dept:‘cashier’,       shift:‘morning’,   role:‘staff’,      active:true, supOf:[] },
+{ id:‘EMP015’, name:‘Biodun Adeyemi’,     dept:‘cashier’,       shift:‘afternoon’, role:‘staff’,      active:true, supOf:[] },
+{ id:‘EMP016’, name:‘Priscilla Nwachukwu’,dept:‘cashier’,       shift:‘afternoon’, role:‘staff’,      active:true, supOf:[] },
+{ id:‘EMP017’, name:‘Quadri Salami’,      dept:‘groceries’,     shift:‘morning’,   role:‘staff’,      active:true, supOf:[] },
+{ id:‘EMP018’, name:‘Rita Okonkwo’,       dept:‘groceries’,     shift:‘morning’,   role:‘staff’,      active:true, supOf:[] },
+{ id:‘EMP019’, name:‘Seun Adeleke’,       dept:‘groceries’,     shift:‘morning’,   role:‘staff’,      active:true, supOf:[] },
+{ id:‘EMP020’, name:‘Taiwo Abiodun’,      dept:‘groceries’,     shift:‘afternoon’, role:‘staff’,      active:true, supOf:[] },
+{ id:‘EMP021’, name:‘Uche Igwe’,          dept:‘groceries’,     shift:‘afternoon’, role:‘staff’,      active:true, supOf:[] },
+{ id:‘EMP022’, name:‘Vera Nnamdi’,        dept:‘drinks’,        shift:‘morning’,   role:‘supervisor’, active:true, supOf:[‘drinks’] },
+{ id:‘EMP023’, name:‘Wasiu Olawale’,      dept:‘drinks’,        shift:‘morning’,   role:‘staff’,      active:true, supOf:[] },
+{ id:‘EMP024’, name:‘Yusuf Garba’,        dept:‘drinks’,        shift:‘afternoon’, role:‘staff’,      active:true, supOf:[] },
+{ id:‘EMP025’, name:‘Zainab Idris’,       dept:‘drinks’,        shift:‘afternoon’, role:‘staff’,      active:true, supOf:[] },
+];
+
+// ─── HELPERS ──────────────────────────────────────────────────────────────────
+
+const fmtDate = (d) => {
+const dt = new Date(d);
+const y = dt.getFullYear();
+const m = String(dt.getMonth()+1).padStart(2,‘0’);
+const day = String(dt.getDate()).padStart(2,‘0’);
+return `${y}-${m}-${day}`;
+};
+
+const addDays = (ds, n) => {
+const d = new Date(ds); d.setDate(d.getDate()+n); return fmtDate(d);
+};
+
+const isSun = (ds) => new Date(ds).getDay() === 0;
+
+const getDaysInMonth = (y, m) => new Date(y, m+1, 0).getDate();
+
+const getMonday = (ds) => {
+const d = new Date(ds);
+const dow = d.getDay();
+const diff = dow === 0 ? -6 : 1 - dow;
+d.setDate(d.getDate()+diff);
+return fmtDate(d);
+};
+
+const initials = (name) => name.split(’ ‘).map(w=>w[0]).slice(0,2).join(’’).toUpperCase();
+
+const avatarColor = (name) => {
+const palette = [’#1A3A6B’,’#16A34A’,’#2563EB’,’#9333EA’,’#EA580C’,’#0891B2’,’#B45309’,’#BE185D’,’#065F46’,’#92400E’];
+let hash = 0;
+for (let i=0; i<name.length; i++) hash = name.charCodeAt(i) + ((hash<<5)-hash);
+return palette[Math.abs(hash) % palette.length];
+};
+
+function generateRoster(staff, year, month) {
+const days = getDaysInMonth(year, month);
+const active = staff.filter(s => s.active);
+const roster = {};
+active.forEach(s => { roster[s.id] = {}; });
+
+// First Monday on or before 1st of month for week parity
+const firstOfMonth = new Date(year, month, 1);
+const firstMondayRef = new Date(firstOfMonth);
+const dow0 = firstOfMonth.getDay();
+firstMondayRef.setDate(firstOfMonth.getDate() - (dow0 === 0 ? 6 : dow0 - 1));
+
+const weekParity = (ds) => {
+const d = new Date(ds);
+const diff = Math.floor((d - firstMondayRef) / (7*86400000));
+return diff % 2; // 0=week1, 1=week2
+};
+
+// Base assignment
+for (let day=1; day<=days; day++) {
+const ds = `${year}-${String(month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+const isSunday = isSun(ds);
+const parity = weekParity(ds);
+active.forEach(s => {
+if (isSunday) {
+if (s.shift === ‘morning’) roster[s.id][ds] = parity === 0 ? ‘sunday’ : ‘off’;
+else roster[s.id][ds] = parity === 1 ? ‘sunday’ : ‘off’;
+} else {
+roster[s.id][ds] = s.shift;
+}
+});
+}
+
+// Buffer weekday offs (4 per staff, surrounding their Sunday offs)
+active.forEach(s => {
+const sundayOffs = [];
+for (let day=1; day<=days; day++) {
+const ds = `${year}-${String(month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+if (isSun(ds) && roster[s.id][ds] === ‘off’) sundayOffs.push(ds);
+}
+
+```
+let buffers = [];
+sundayOffs.forEach(sd => {
+  [-3,-2,-1,1,2].forEach(n => {
+    const candidate = addDays(sd, n);
+    if (new Date(candidate).getMonth() !== month) return;
+    if (isSun(candidate)) return;
+    const dow = new Date(candidate).getDay();
+    if (dow >= 4 || dow <= 2) buffers.push(candidate);
+  });
+});
+buffers = [...new Set(buffers)].slice(0,4);
+
+// 50% coverage check
+buffers.forEach(ds => {
+  const deptShiftStaff = active.filter(x => x.dept === s.dept && x.shift === s.shift);
+  const offAlready = deptShiftStaff.filter(x => roster[x.id][ds] === 'off').length;
+  if (deptShiftStaff.length <= 1 || offAlready < Math.ceil(deptShiftStaff.length / 2)) {
+    roster[s.id][ds] = 'off';
+  }
+});
+```
+
+});
+
+// Long hour when partner is off
+const groups = {};
+active.forEach(s => {
+const k = `${s.dept}|${s.shift}`;
+if (!groups[k]) groups[k] = [];
+groups[k].push(s);
+});
+const pairs = [];
+Object.values(groups).forEach(g => {
+for (let i=0; i<g.length; i+=2) {
+if (i+1 < g.length) pairs.push([g[i],g[i+1]]);
+else pairs.push([g[i]]);
+}
+});
+
+for (let day=1; day<=days; day++) {
+const ds = `${year}-${String(month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+if (isSun(ds)) continue;
+pairs.forEach(pair => {
+if (pair.length < 2) return;
+const [a,b] = pair;
+const aS = roster[a.id]?.[ds], bS = roster[b.id]?.[ds];
+if (aS === ‘off’ && bS !== ‘off’) roster[b.id][ds] = ‘longhour’;
+else if (bS === ‘off’ && aS !== ‘off’) roster[a.id][ds] = ‘longhour’;
+});
+}
+
+return roster;
+}
+
+function buildPairs(staff) {
+const groups = {};
+staff.filter(s=>s.active).forEach(s => {
+const k = `${s.dept}|${s.shift}`;
+if (!groups[k]) groups[k] = [];
+groups[k].push(s);
+});
+const pairs = [];
+Object.values(groups).forEach(g => {
+for (let i=0; i<g.length; i+=2) {
+pairs.push(g.slice(i, i+2));
+}
+});
+return pairs;
+}
+
+function makeICS(events) {
+const lines = [‘BEGIN:VCALENDAR’,‘VERSION:2.0’,‘PRODID:-//Justrite//Staff//EN’,‘CALSCALE:GREGORIAN’,‘METHOD:PUBLISH’];
+events.forEach(ev => {
+const dt = ev.date.replace(/-/g,’’);
+lines.push(‘BEGIN:VEVENT’,`UID:${ev.uid}@justrite.ng`,`DTSTART:${dt}T${ev.start}`,`DTEND:${dt}T${ev.end}`,`SUMMARY:${ev.summary}`,`DESCRIPTION:${ev.desc}`);
+if (ev.alarm) { lines.push(‘BEGIN:VALARM’,‘ACTION:DISPLAY’,`DESCRIPTION:Shift reminder`,`TRIGGER:-PT${ev.alarm}M`,‘END:VALARM’); }
+lines.push(‘END:VEVENT’);
+});
+lines.push(‘END:VCALENDAR’);
+return lines.join(’\r\n’);
+}
+
+function downloadFile(content, name, type) {
+const blob = new Blob([content], {type});
+const url = URL.createObjectURL(blob);
+const a = document.createElement(‘a’);
+a.href = url; a.download = name;
+document.body.appendChild(a); a.click();
+document.body.removeChild(a); URL.revokeObjectURL(url);
+}
+
+const shiftTimes = { morning:[‘073000’,‘150000’], afternoon:[‘133000’,‘210000’], sunday:[‘093000’,‘213000’], longhour:[‘100000’,‘220000’], off:[‘000000’,‘000000’] };
+
+const MONTH_NAMES = [‘January’,‘February’,‘March’,‘April’,‘May’,‘June’,‘July’,‘August’,‘September’,‘October’,‘November’,‘December’];
+const DOW_SHORT = [‘Mo’,‘Tu’,‘We’,‘Th’,‘Fr’,‘Sa’,‘Su’];
+
+// ─── STYLE HELPERS ────────────────────────────────────────────────────────────
+
+const css = {
+// Layout
+page: { padding: ‘16px 14px 32px’, maxWidth: 600, margin: ‘0 auto’ },
+
+// Card
+card: { background: ‘#fff’, borderRadius: 16, padding: ‘16px’, marginBottom: 12, boxShadow: ‘0 2px 10px rgba(26,58,107,0.08)’, border: ‘1px solid #E8EEFF’ },
+
+// Button factory
+btn: (v=‘primary’, sz=‘md’) => {
+const base = { border:‘none’, borderRadius:10, cursor:‘pointer’, fontFamily:”‘Sora’,sans-serif”, fontWeight:700, display:‘inline-flex’, alignItems:‘center’, justifyContent:‘center’, gap:6, transition:‘all 0.15s’, whiteSpace:‘nowrap’ };
+const sizes = { xs:{padding:‘4px 10px’,fontSize:11}, sm:{padding:‘7px 14px’,fontSize:12}, md:{padding:‘10px 20px’,fontSize:13}, lg:{padding:‘13px 26px’,fontSize:14} };
+const variants = {
+primary: { background:’#1A3A6B’, color:’#fff’ },
+yellow:  { background:’#F5C518’, color:’#0D1B3E’ },
+outline: { background:‘transparent’, color:’#1A3A6B’, border:‘2px solid #1A3A6B’ },
+ghost:   { background:’#E8EEFF’, color:’#1A3A6B’ },
+danger:  { background:’#FEE2E2’, color:’#DC2626’, border:‘1px solid #FECACA’ },
+success: { background:’#DCFCE7’, color:’#16A34A’ },
+muted:   { background:’#F1F5F9’, color:’#64748B’ },
+};
+return { …base, …sizes[sz], …variants[v] };
+},
+
+// Input
+input: { width:‘100%’, padding:‘10px 13px’, border:‘2px solid #D4DCF0’, borderRadius:10, fontSize:14, fontFamily:”‘Sora’,sans-serif”, background:’#fff’, color:’#0D1B3E’, outline:‘none’ },
+label: { fontSize:11, fontWeight:700, color:’#5A6A8A’, marginBottom:5, display:‘block’, textTransform:‘uppercase’, letterSpacing:‘0.5px’ },
+formGroup: { marginBottom:16 },
+
+// Shift badge inline
+shiftBadge: (s) => {
+const sh = SHIFTS[s] || { bg:’#f0f0f0’, fg:’#666’, short: s?.slice(0,3).toUpperCase() };
+return { display:‘inline-block’, padding:‘3px 9px’, borderRadius:8, fontSize:11, fontWeight:700, background:sh.bg, color:sh.fg, fontFamily:”‘JetBrains Mono’,monospace”, letterSpacing:‘0.5px’ };
+},
+
+// Roster cell (compact)
+rCell: (s) => {
+const sh = SHIFTS[s] || { bg:’#f0f0f0’, fg:’#888’ };
+return { background:sh.bg, color:sh.fg, borderRadius:7, padding:‘4px 3px’, fontSize:9, fontWeight:700, textAlign:‘center’, fontFamily:”‘JetBrains Mono’,monospace”, minWidth:34 };
+},
+
+// Alert
+alert: (t) => ({ padding:‘10px 14px’, borderRadius:10, fontSize:13, fontWeight:600, marginBottom:12, background:t===‘error’?’#FEE2E2’:t===‘success’?’#DCFCE7’:’#FEF3C7’, color:t===‘error’?’#DC2626’:t===‘success’?’#16A34A’:’#D97706’, border:`1px solid ${t==='error'?'#FECACA':t==='success'?'#BBF7D0':'#FDE68A'}` }),
+
+// Section header
+sh: { fontSize:15, fontWeight:800, color:’#0D1B3E’, marginBottom:12, display:‘flex’, alignItems:‘center’, justifyContent:‘space-between’ },
+
+// Stat
+stat: { textAlign:‘center’, background:’#F0F4FF’, borderRadius:12, padding:‘12px 8px’ },
+
+// Overlay/Modal
+overlay: { position:‘fixed’, inset:0, background:‘rgba(13,27,62,0.55)’, zIndex:300, display:‘flex’, alignItems:‘flex-end’, justifyContent:‘center’ },
+modal: { background:’#fff’, borderRadius:‘20px 20px 0 0’, padding:‘24px 18px 32px’, width:‘100%’, maxWidth:600, maxHeight:‘88vh’, overflowY:‘auto’ },
+modalHandle: { width:40, height:4, background:’#D4DCF0’, borderRadius:2, margin:‘0 auto 20px’ },
+};
+
+// ─── SHARED COMPONENTS ────────────────────────────────────────────────────────
+
+function Avt({ name, size=40 }) {
+const bg = avatarColor(name);
+const ini = initials(name);
+return (
+<div style={{ width:size, height:size, borderRadius:‘50%’, background:bg, display:‘flex’, alignItems:‘center’, justifyContent:‘center’, fontSize:size*0.35, fontWeight:800, color:’#fff’, flexShrink:0, boxShadow:‘0 2px 8px rgba(0,0,0,0.15)’ }}>
+{ini}
+</div>
+);
+}
+
+function Btn({ v=‘primary’, sz=‘md’, onClick, children, style={}, disabled=false }) {
+return <button style={{ …css.btn(v,sz), opacity:disabled?0.5:1, …style }} onClick={onClick} disabled={disabled}>{children}</button>;
+}
+
+function Alert({ type, children }) { return <div style={css.alert(type)}>{children}</div>; }
+
+function Modal({ open, onClose, title, children }) {
+if (!open) return null;
+return (
+<div style={css.overlay} onClick={e => e.target===e.currentTarget && onClose()}>
+<div style={css.modal}>
+<div style={css.modalHandle} />
+{title && <div style={{ fontSize:17, fontWeight:800, marginBottom:16, color:’#0D1B3E’ }}>{title}</div>}
+{children}
+<div style={{height:8}} />
+</div>
+</div>
+);
+}
+
+function ShiftPill({ shift }) {
+const s = SHIFTS[shift];
+if (!s) return null;
+return <span style={css.shiftBadge(shift)}>{s.short}</span>;
+}
+
+// ─── SCREEN: LOGIN ─────────────────────────────────────────────────────────────
+
+function LoginScreen({ onLogin }) {
+const [id, setId] = useState(’’);
+const [err, setErr] = useState(’’);
+
+const go = () => {
+const v = id.trim().toUpperCase();
+if (!v) { setErr(‘Enter your Staff ID’); return; }
+const ok = onLogin(v);
+if (!ok) setErr(‘Staff ID not found. Try ADMIN for admin access.’);
+};
+
+return (
+<div style={{ minHeight:‘100vh’, background:‘linear-gradient(160deg,#1A3A6B 0%,#0D2347 55%,#061529 100%)’, display:‘flex’, flexDirection:‘column’, alignItems:‘center’, justifyContent:‘center’, padding:24 }}>
+{/* Logo area */}
+<div style={{ textAlign:‘center’, marginBottom:40 }}>
+<div style={{ width:80, height:80, background:’#F5C518’, borderRadius:24, display:‘flex’, alignItems:‘center’, justifyContent:‘center’, margin:‘0 auto 18px’, fontSize:38, boxShadow:‘0 8px 32px rgba(245,197,24,0.4)’ }}>🛒</div>
+<h1 style={{ color:’#fff’, fontSize:26, fontWeight:900, letterSpacing:’-0.5px’, marginBottom:6 }}>Justrite Superstore</h1>
+<p style={{ color:‘rgba(255,255,255,0.5)’, fontSize:12, fontFamily:”‘JetBrains Mono’,monospace”, letterSpacing:2 }}>ILE-IFE · STAFF PORTAL</p>
+</div>
+
+```
+  <div style={{ background:'#fff', borderRadius:24, padding:'28px 24px', width:'100%', maxWidth:380, boxShadow:'0 24px 64px rgba(0,0,0,0.35)' }}>
+    <h2 style={{ fontSize:20, fontWeight:800, marginBottom:4, color:'#0D1B3E' }}>Sign In</h2>
+    <p style={{ fontSize:13, color:'#5A6A8A', marginBottom:24 }}>Enter your Staff ID to continue</p>
+
+    {err && <Alert type="error">{err}</Alert>}
+
+    <div style={css.formGroup}>
+      <label style={css.label}>Staff ID</label>
+      <input
+        style={{ ...css.input, fontSize:17, letterSpacing:3, fontFamily:"'JetBrains Mono',monospace", textTransform:'uppercase' }}
+        placeholder="EMP001 or ADMIN"
+        value={id}
+        onChange={e => { setId(e.target.value); setErr(''); }}
+        onKeyDown={e => e.key==='Enter' && go()}
+        autoCapitalize="characters"
+        autoCorrect="off"
+      />
+    </div>
+
+    <Btn v="yellow" sz="lg" onClick={go} style={{ width:'100%', fontSize:15 }}>Continue →</Btn>
+
+    <div style={{ marginTop:20, padding:'12px 14px', background:'#F0F4FF', borderRadius:10 }}>
+      <div style={{ fontSize:11, fontWeight:700, color:'#5A6A8A', marginBottom:6, textTransform:'uppercase', letterSpacing:'0.5px' }}>Quick Access</div>
+      <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
+        {['ADMIN','EMP001','EMP003','EMP017'].map(s => (
+          <button key={s} style={{ padding:'4px 10px', borderRadius:8, border:'1.5px solid #D4DCF0', background:'#fff', fontSize:11, fontFamily:"'JetBrains Mono',monospace", fontWeight:700, cursor:'pointer', color:'#1A3A6B' }} onClick={() => { setId(s); setErr(''); }}>{s}</button>
+        ))}
+      </div>
+    </div>
+  </div>
+</div>
+```
+
+);
+}
+
+// ─── SCREEN: ROSTER (Main view matching screenshot) ──────────────────────────
+
+function RosterScreen({ staff, setStaff, departments, roster, setRoster, rosterStatus, setRosterStatus, currentUser }) {
+const now = new Date();
+const [year, setYear] = useState(now.getFullYear());
+const [month, setMonth] = useState(now.getMonth());
+const [filterDept, setFilterDept] = useState(’’);
+const [filterShift, setFilterShift] = useState(’’);
+const [search, setSearch] = useState(’’);
+const [generating, setGenerating] = useState(false);
+const [alert, setAlert] = useState(null);
+const [editCell, setEditCell] = useState(null); // {empId, date}
+const [addModal, setAddModal] = useState(false);
+
+const mk = `${year}-${String(month+1).padStart(2,'0')}`;
+const monthRoster = roster[mk] || {};
+const status = rosterStatus[mk];
+const days = getDaysInMonth(year, month);
+const daysArr = Array.from({length:days}, (_,i) => `${year}-${String(month+1).padStart(2,'0')}-${String(i+1).padStart(2,'0')}`);
+const isAdmin = currentUser.id === ADMIN_ID;
+const isSup = currentUser.role === ‘supervisor’;
+const canEdit = isAdmin || isSup;
+const isLocked = status === ‘approved’ || status === ‘published’;
+const deptMap = useMemo(() => Object.fromEntries(departments.map(d=>[d.id,d])), [departments]);
+
+const filteredStaff = useMemo(() => staff.filter(s => {
+if (!s.active) return false;
+if (filterDept && s.dept !== filterDept) return false;
+if (filterShift && s.shift !== filterShift) return false;
+if (search && !s.name.toLowerCase().includes(search.toLowerCase()) && !s.id.toLowerCase().includes(search.toLowerCase())) return false;
+return true;
+}), [staff, filterDept, filterShift, search]);
+
+const gen = () => {
+setGenerating(true);
+setTimeout(() => {
+const r = generateRoster(staff, year, month);
+setRoster(p => ({ …p, [mk]: r }));
+setRosterStatus(p => ({ …p, [mk]: ‘draft’ }));
+setGenerating(false);
+setAlert({ t:‘success’, msg:`Roster generated for ${MONTH_NAMES[month]} ${year}` });
+}, 500);
+};
+
+const updateCell = (empId, date, shift) => {
+if (isLocked && !isAdmin) { setAlert({ t:‘error’, msg:‘Roster is locked.’ }); return; }
+setRoster(p => ({ …p, [mk]: { …p[mk], [empId]: { …p[mk]?.[empId], [date]: shift } } }));
+setEditCell(null);
+};
+
+const offCount = (empId) => Object.values(monthRoster[empId]||{}).filter(s=>s===‘off’).length;
+
+const getDow = (ds) => (new Date(ds).getDay()+6)%7;
+
+// Status color
+const statusStyle = { draft:’#F5C518’, approved:’#2563EB’, published:’#16A34A’ };
+
+return (
+<div style={css.page}>
+{alert && <div style={{ …css.alert(alert.t), display:‘flex’, justifyContent:‘space-between’, alignItems:‘center’ }}>
+{alert.msg}<button style={{ background:‘none’,border:‘none’,cursor:‘pointer’,fontSize:16 }} onClick={()=>setAlert(null)}>✕</button>
+</div>}
+
+```
+  {/* Month nav */}
+  <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:14 }}>
+    <Btn v="ghost" sz="sm" onClick={() => { if (month===0){setYear(y=>y-1);setMonth(11)}else setMonth(m=>m-1); }}>‹</Btn>
+    <div style={{ flex:1, textAlign:'center', fontWeight:800, fontSize:17 }}>{MONTH_NAMES[month]} {year}</div>
+    <Btn v="ghost" sz="sm" onClick={() => { if (month===11){setYear(y=>y+1);setMonth(0)}else setMonth(m=>m+1); }}>›</Btn>
+  </div>
+
+  {/* Status + generate */}
+  <div style={{ ...css.card, display:'flex', alignItems:'center', gap:12, padding:'12px 16px', marginBottom:14 }}>
+    <div style={{ flex:1 }}>
+      <div style={{ fontSize:11, fontWeight:700, color:'#5A6A8A', textTransform:'uppercase', letterSpacing:'0.5px', marginBottom:3 }}>Roster Status</div>
+      <div style={{ display:'flex', alignItems:'center', gap:7 }}>
+        <div style={{ width:8, height:8, borderRadius:'50%', background:statusStyle[status]||'#D4DCF0' }} />
+        <span style={{ fontSize:13, fontWeight:800, color:'#0D1B3E', textTransform:'capitalize' }}>{status||'Not Generated'}</span>
+      </div>
+    </div>
+    {canEdit && (
+      <Btn v={Object.keys(monthRoster).length>0?'ghost':'yellow'} sz="sm" onClick={gen} disabled={generating||(!isAdmin&&isLocked)}>
+        {generating ? '⏳ Generating…' : Object.keys(monthRoster).length>0 ? '🔄 Regen' : '⚡ Generate'}
+      </Btn>
+    )}
+  </div>
+
+  {/* Filters */}
+  <div style={{ display:'flex', gap:8, marginBottom:12 }}>
+    <input style={{ ...css.input, flex:1, padding:'8px 12px', fontSize:13 }} placeholder="🔍 Search staff…" value={search} onChange={e=>setSearch(e.target.value)} />
+    <select style={{ ...css.input, width:'auto', minWidth:100, padding:'8px 10px', fontSize:12 }} value={filterDept} onChange={e=>setFilterDept(e.target.value)}>
+      <option value="">All Depts</option>
+      {departments.map(d=><option key={d.id} value={d.id}>{d.name}</option>)}
+    </select>
+    <select style={{ ...css.input, width:'auto', minWidth:80, padding:'8px 10px', fontSize:12 }} value={filterShift} onChange={e=>setFilterShift(e.target.value)}>
+      <option value="">All</option>
+      <option value="morning">Mor</option>
+      <option value="afternoon">Aft</option>
+    </select>
+  </div>
+
+  {/* Add staff button (admin/sup) */}
+  {canEdit && (
+    <Btn v="yellow" sz="sm" onClick={()=>setAddModal(true)} style={{ marginBottom:14, width:'100%', fontSize:13 }}>+ Add Staff Member</Btn>
+  )}
+
+  {/* Staff roster list – matches screenshot style */}
+  {filteredStaff.length === 0 && (
+    <div style={{ textAlign:'center', padding:'40px 20px', color:'#5A6A8A' }}>
+      <div style={{ fontSize:36, marginBottom:12 }}>👥</div>
+      <div style={{ fontWeight:700 }}>{Object.keys(monthRoster).length===0 ? 'Generate the roster first' : 'No matching staff'}</div>
+    </div>
+  )}
+
+  {filteredStaff.map(s => {
+    const dept = deptMap[s.dept];
+    const empRoster = monthRoster[s.id] || {};
+    const offs = offCount(s.id);
+    return (
+      <div key={s.id} style={{ ...css.card, padding:'12px 14px' }}>
+        {/* Staff header row */}
+        <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom: Object.keys(empRoster).length > 0 ? 10 : 0 }}>
+          <Avt name={s.name} size={42} />
+          <div style={{ flex:1, minWidth:0 }}>
+            <div style={{ fontWeight:700, fontSize:14, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{s.name}</div>
+            <div style={{ display:'flex', gap:6, marginTop:3, alignItems:'center', flexWrap:'wrap' }}>
+              {dept && <span style={{ fontSize:11, fontWeight:700, color:dept.color }}>{dept.name}</span>}
+              {s.role==='supervisor' && <span style={{ fontSize:10, fontWeight:700, background:'#FEF3C7', color:'#D97706', padding:'1px 7px', borderRadius:6 }}>SUP</span>}
+              <ShiftPill shift={s.shift} />
+            </div>
+          </div>
+          <div style={{ textAlign:'right', flexShrink:0 }}>
+            <div style={{ fontSize:10, fontWeight:700, color: offs>=6?'#16A34A':'#D97706', fontFamily:"'JetBrains Mono',monospace" }}>{offs}/6 off</div>
+          </div>
+        </div>
+
+        {/* Monthly roster strip (horizontal scroll) */}
+        {Object.keys(empRoster).length > 0 && (
+          <div style={{ overflowX:'auto', paddingBottom:2 }}>
+            <div style={{ display:'flex', gap:3, minWidth:'max-content' }}>
+              {daysArr.map(d => {
+                const shift = empRoster[d] || s.shift;
+                const dow = getDow(d);
+                const dayNum = new Date(d).getDate();
+                const isToday = d === fmtDate(new Date());
+                const sh = SHIFTS[shift] || SHIFTS.morning;
+                return (
+                  <div key={d} onClick={() => canEdit && (!isLocked||isAdmin) && setEditCell({empId:s.id,date:d})}
+                    style={{ ...css.rCell(shift), minWidth:30, cursor:canEdit?'pointer':'default', outline:isToday?'2px solid #F5C518':'none', position:'relative' }}>
+                    <div style={{ fontSize:8, opacity:0.7, marginBottom:1, fontFamily:"'JetBrains Mono',monospace" }}>{DOW_SHORT[dow][0]}{dayNum}</div>
+                    <div>{sh.short}</div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  })}
+
+  {/* Legend */}
+  {Object.keys(monthRoster).length > 0 && (
+    <div style={{ ...css.card, padding:'10px 14px' }}>
+      <div style={{ fontSize:11, fontWeight:700, color:'#5A6A8A', marginBottom:8, textTransform:'uppercase' }}>Legend</div>
+      <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
+        {Object.entries(SHIFTS).map(([k,v]) => (
+          <div key={k} style={{ display:'flex', alignItems:'center', gap:5 }}>
+            <span style={{ ...css.shiftBadge(k), fontSize:10, padding:'2px 7px' }}>{v.short}</span>
+            <span style={{ fontSize:11, color:'#5A6A8A' }}>{v.label}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )}
+
+  {/* Edit Cell Modal */}
+  <Modal open={!!editCell} onClose={()=>setEditCell(null)} title={`Change Shift – ${editCell?.date}`}>
+    {Object.keys(SHIFTS).map(sk => (
+      <button key={sk} style={{ ...css.btn('ghost','md'), width:'100%', justifyContent:'space-between', marginBottom:8 }}
+        onClick={() => updateCell(editCell.empId, editCell.date, sk)}>
+        <span style={css.shiftBadge(sk)}>{SHIFTS[sk].short}</span>
+        <span style={{ flex:1, textAlign:'left', marginLeft:12 }}>{SHIFTS[sk].label}</span>
+        <span style={{ fontSize:12, color:'#5A6A8A' }}>{SHIFTS[sk].time}</span>
+      </button>
+    ))}
+  </Modal>
+
+  {/* Add Staff Modal */}
+  <AddStaffModal open={addModal} onClose={()=>setAddModal(false)} staff={staff} setStaff={setStaff} departments={departments} />
+</div>
+```
+
+);
+}
+
+// ─── ADD STAFF MODAL ──────────────────────────────────────────────────────────
+
+function AddStaffModal({ open, onClose, staff, setStaff, departments }) {
+const [form, setForm] = useState({ id:’’, name:’’, dept:‘cashier’, shift:‘morning’, role:‘staff’, supOf:[], active:true });
+const [err, setErr] = useState(’’);
+
+const save = () => {
+if (!form.name.trim()) { setErr(‘Name required’); return; }
+const nextId = form.id.trim().toUpperCase() || `EMP${String(staff.length+1).padStart(3,'0')}`;
+if (!form.id && staff.find(s=>s.id===nextId)) { setErr(‘ID already exists’); return; }
+setStaff(p => […p, { …form, id: nextId }]);
+setForm({ id:’’, name:’’, dept:‘cashier’, shift:‘morning’, role:‘staff’, supOf:[], active:true });
+setErr(’’);
+onClose();
+};
+
+return (
+<Modal open={open} onClose={onClose} title="Add Staff Member">
+{err && <Alert type="error">{err}</Alert>}
+<div style={css.formGroup}>
+<label style={css.label}>Full Name *</label>
+<input style={css.input} value={form.name} onChange={e=>setForm(f=>({…f,name:e.target.value}))} placeholder=“First Surname” />
+</div>
+<div style={css.formGroup}>
+<label style={css.label}>Staff ID (auto if blank)</label>
+<input style={{ …css.input, fontFamily:”‘JetBrains Mono’,monospace”, textTransform:‘uppercase’ }} value={form.id} onChange={e=>setForm(f=>({…f,id:e.target.value.toUpperCase()}))} placeholder=“e.g. EMP026” />
+</div>
+<div style={{ display:‘grid’, gridTemplateColumns:‘1fr 1fr’, gap:10 }}>
+<div style={css.formGroup}>
+<label style={css.label}>Department</label>
+<select style={css.input} value={form.dept} onChange={e=>setForm(f=>({…f,dept:e.target.value}))}>
+{departments.map(d=><option key={d.id} value={d.id}>{d.name}</option>)}
+</select>
+</div>
+<div style={css.formGroup}>
+<label style={css.label}>Shift</label>
+<select style={css.input} value={form.shift} onChange={e=>setForm(f=>({…f,shift:e.target.value}))}>
+<option value="morning">Morning</option>
+<option value="afternoon">Afternoon</option>
+</select>
+</div>
+</div>
+<div style={css.formGroup}>
+<label style={css.label}>Role</label>
+<select style={css.input} value={form.role} onChange={e=>setForm(f=>({…f,role:e.target.value}))}>
+<option value="staff">Staff</option>
+<option value="supervisor">Supervisor</option>
+</select>
+</div>
+<div style={{ display:‘flex’, gap:8 }}>
+<Btn v="outline" onClick={onClose}>Cancel</Btn>
+<Btn v=“yellow” onClick={save} style={{ flex:1 }}>Add Staff</Btn>
+</div>
+</Modal>
+);
+}
+
+// ─── SCREEN: DIRECTORY ────────────────────────────────────────────────────────
+
+function DirectoryScreen({ staff, setStaff, departments }) {
+const [search, setSearch] = useState(’’);
+const [filterDept, setFilterDept] = useState(’’);
+const [editModal, setEditModal] = useState(null);
+const [addModal, setAddModal] = useState(false);
+const [editForm, setEditForm] = useState(null);
+
+const deptMap = Object.fromEntries(departments.map(d=>[d.id,d]));
+
+const filtered = staff.filter(s => {
+if (search && !s.name.toLowerCase().includes(search.toLowerCase()) && !s.id.toLowerCase().includes(search.toLowerCase())) return false;
+if (filterDept && s.dept !== filterDept) return false;
+return true;
+});
+
+const openEdit = (s) => { setEditForm({ …s }); setEditModal(s.id); };
+
+const saveEdit = () => {
+setStaff(p => p.map(s => s.id === editModal ? { …editForm } : s));
+setEditModal(null);
+};
+
+const toggle = (id) => setStaff(p => p.map(s => s.id===id ? {…s,active:!s.active} : s));
+
+// Dept stats
+const deptStats = departments.map(d => ({
+…d,
+count: staff.filter(s=>s.dept===d.id&&s.active).length
+}));
+
+return (
+<div style={css.page}>
+{/* Dept summary chips */}
+<div style={{ display:‘flex’, gap:8, overflowX:‘auto’, marginBottom:14, paddingBottom:4 }}>
+{deptStats.map(d => (
+<div key={d.id} onClick={()=>setFilterDept(f=>f===d.id?’’:d.id)}
+style={{ flexShrink:0, padding:‘6px 12px’, borderRadius:10, background:filterDept===d.id?d.color:’#fff’, color:filterDept===d.id?’#fff’:d.color, border:`2px solid ${d.color}`, cursor:‘pointer’, fontSize:12, fontWeight:700, whiteSpace:‘nowrap’, boxShadow:‘0 1px 4px rgba(0,0,0,0.08)’ }}>
+{d.name} <span style={{ opacity:0.75 }}>({d.count})</span>
+</div>
+))}
+</div>
+
+```
+  <div style={{ display:'flex', gap:8, marginBottom:14 }}>
+    <input style={{ ...css.input, flex:1, padding:'9px 12px', fontSize:13 }} placeholder="🔍 Search…" value={search} onChange={e=>setSearch(e.target.value)} />
+    <Btn v="yellow" sz="sm" onClick={()=>setAddModal(true)}>+ Add</Btn>
+  </div>
+
+  {filtered.map(s => {
+    const dept = deptMap[s.dept];
+    return (
+      <div key={s.id} style={{ ...css.card, display:'flex', alignItems:'center', gap:12, padding:'11px 14px', opacity:s.active?1:0.5 }}>
+        <Avt name={s.name} size={44} />
+        <div style={{ flex:1, minWidth:0 }}>
+          <div style={{ fontWeight:700, fontSize:14, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{s.name}</div>
+          <div style={{ fontSize:11, color:'#5A6A8A', fontFamily:"'JetBrains Mono',monospace", marginTop:2 }}>{s.id}</div>
+          <div style={{ display:'flex', gap:5, marginTop:4, alignItems:'center', flexWrap:'wrap' }}>
+            {dept && <span style={{ fontSize:11, fontWeight:700, color:dept.color }}>{dept.name}</span>}
+            <ShiftPill shift={s.shift} />
+            {s.role==='supervisor' && <span style={{ fontSize:10, background:'#FEF3C7', color:'#D97706', padding:'1px 7px', borderRadius:6, fontWeight:700 }}>SUP</span>}
+          </div>
+        </div>
+        <div style={{ display:'flex', flexDirection:'column', gap:5, flexShrink:0 }}>
+          <Btn v="ghost" sz="xs" onClick={()=>openEdit(s)}>✏️ Edit</Btn>
+          <Btn v={s.active?'danger':'success'} sz="xs" onClick={()=>toggle(s.id)}>{s.active?'Deactivate':'Activate'}</Btn>
+        </div>
+      </div>
+    );
+  })}
+
+  {/* Edit modal */}
+  <Modal open={!!editModal} onClose={()=>setEditModal(null)} title="Edit Staff">
+    {editForm && <>
+      <div style={css.formGroup}>
+        <label style={css.label}>Full Name</label>
+        <input style={css.input} value={editForm.name} onChange={e=>setEditForm(f=>({...f,name:e.target.value}))} />
+      </div>
+      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
+        <div style={css.formGroup}>
+          <label style={css.label}>Department</label>
+          <select style={css.input} value={editForm.dept} onChange={e=>setEditForm(f=>({...f,dept:e.target.value}))}>
+            {departments.map(d=><option key={d.id} value={d.id}>{d.name}</option>)}
+          </select>
+        </div>
+        <div style={css.formGroup}>
+          <label style={css.label}>Shift</label>
+          <select style={css.input} value={editForm.shift} onChange={e=>setEditForm(f=>({...f,shift:e.target.value}))}>
+            <option value="morning">Morning</option>
+            <option value="afternoon">Afternoon</option>
+          </select>
+        </div>
+      </div>
+      <div style={css.formGroup}>
+        <label style={css.label}>Role</label>
+        <select style={css.input} value={editForm.role} onChange={e=>setEditForm(f=>({...f,role:e.target.value}))}>
+          <option value="staff">Staff</option>
+          <option value="supervisor">Supervisor</option>
+        </select>
+      </div>
+      <div style={{ display:'flex', gap:8 }}>
+        <Btn v="outline" onClick={()=>setEditModal(null)}>Cancel</Btn>
+        <Btn v="yellow" onClick={saveEdit} style={{ flex:1 }}>Save Changes</Btn>
+      </div>
+    </>}
+  </Modal>
+
+  <AddStaffModal open={addModal} onClose={()=>setAddModal(false)} staff={staff} setStaff={setStaff} departments={departments} />
+</div>
+```
+
+);
+}
+
+// ─── SCREEN: MY SCHEDULE (Staff portal) ───────────────────────────────────────
+
+function MyScheduleScreen({ currentUser, staff, departments, roster, rosterStatus }) {
+const now = new Date();
+const [year, setYear] = useState(now.getFullYear());
+const [month, setMonth] = useState(now.getMonth());
+const [reminder, setReminder] = useState(‘60’);
+const [alert, setAlert] = useState(null);
+
+const mk = `${year}-${String(month+1).padStart(2,'0')}`;
+const status = rosterStatus[mk];
+const myRoster = roster[mk]?.[currentUser.id] || {};
+const isAdmin = currentUser.id === ADMIN_ID;
+const deptMap = Object.fromEntries(departments.map(d=>[d.id,d]));
+const dept = deptMap[currentUser.dept];
+
+const pairs = buildPairs(staff);
+const myPair = pairs.find(p => p.some(s=>s.id===currentUser.id));
+const partner = myPair?.find(s=>s.id!==currentUser.id);
+
+const offCount = Object.values(myRoster).filter(s=>s===‘off’).length;
+const todayStr = fmtDate(now);
+const weekStart = getMonday(todayStr);
+const weekDays = Array.from({length:7}, (_,i) => addDays(weekStart,i));
+
+const published = status === ‘published’ || isAdmin;
+
+const exportICS = (daysToExport) => {
+const events = daysToExport.map(d => {
+const s = myRoster[d] || (isSun(d)?‘sunday’:currentUser.shift);
+if (s===‘off’) return null;
+const [start,end] = shiftTimes[s]||[‘000000’,‘000000’];
+return { uid:`${currentUser.id}-${d}`, date:d, start, end, summary:`Justrite ${SHIFTS[s]?.label} Shift`, desc:`${SHIFTS[s]?.time} | ${dept?.name||''}`, alarm:parseInt(reminder) };
+}).filter(Boolean);
+if (!events.length) { setAlert({t:‘error’,msg:‘No work days to export.’}); return; }
+downloadFile(makeICS(events), `justrite-${currentUser.id}-schedule.ics`, ‘text/calendar’);
+setAlert({t:‘success’,msg:‘Calendar file downloaded!’});
+};
+
+if (!published) {
+return (
+<div style={{ …css.page, textAlign:‘center’, paddingTop:60 }}>
+<div style={{ fontSize:52, marginBottom:16 }}>🔒</div>
+<div style={{ fontSize:18, fontWeight:800, marginBottom:8 }}>Roster Not Published</div>
+<div style={{ color:’#5A6A8A’, fontSize:14 }}>The {MONTH_NAMES[month]} {year} roster hasn’t been published yet.</div>
+<div style={{ display:‘flex’, justifyContent:‘center’, gap:8, marginTop:20 }}>
+<Btn v=“ghost” sz=“sm” onClick={()=>{if(month===0){setYear(y=>y-1);setMonth(11)}else setMonth(m=>m-1)}}>‹ Prev</Btn>
+<Btn v=“ghost” sz=“sm” onClick={()=>{if(month===11){setYear(y=>y+1);setMonth(0)}else setMonth(m=>m+1)}}>Next ›</Btn>
+</div>
+</div>
+);
+}
+
+return (
+<div style={css.page}>
+{alert && <Alert type={alert.t}>{alert.msg}</Alert>}
+
+```
+  {/* Profile card */}
+  <div style={{ background:'linear-gradient(135deg,#1A3A6B,#2352A0)', borderRadius:20, padding:'18px 18px 14px', marginBottom:14, color:'#fff' }}>
+    <div style={{ display:'flex', gap:14, alignItems:'center', marginBottom:14 }}>
+      <Avt name={currentUser.name} size={56} />
+      <div>
+        <div style={{ fontWeight:800, fontSize:17 }}>{currentUser.name}</div>
+        <div style={{ fontSize:12, opacity:0.65, fontFamily:"'JetBrains Mono',monospace", marginTop:2 }}>{currentUser.id}</div>
+        {dept && <div style={{ fontSize:12, marginTop:4, fontWeight:600, opacity:0.85 }}>{dept.name} Department</div>}
+      </div>
+    </div>
+    <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
+      <div style={{ background:'rgba(255,255,255,0.15)', borderRadius:10, padding:'6px 12px', fontSize:12, fontWeight:700 }}>
+        🕐 {SHIFTS[currentUser.shift]?.label} Shift
+      </div>
+      {partner && (
+        <div style={{ background:'rgba(255,255,255,0.15)', borderRadius:10, padding:'6px 12px', fontSize:12, fontWeight:700 }}>
+          👥 {partner.name.split(' ')[0]}
+        </div>
+      )}
+      <div style={{ background: offCount>=6?'rgba(22,163,74,0.35)':'rgba(245,197,24,0.35)', borderRadius:10, padding:'6px 12px', fontSize:12, fontWeight:700 }}>
+        🔴 {offCount}/6 days off
+      </div>
+    </div>
+  </div>
+
+  {/* Month nav */}
+  <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:12 }}>
+    <Btn v="ghost" sz="sm" onClick={()=>{if(month===0){setYear(y=>y-1);setMonth(11)}else setMonth(m=>m-1)}}>‹</Btn>
+    <div style={{ flex:1, textAlign:'center', fontWeight:700, fontSize:15 }}>{MONTH_NAMES[month]} {year}</div>
+    <Btn v="ghost" sz="sm" onClick={()=>{if(month===11){setYear(y=>y+1);setMonth(0)}else setMonth(m=>m+1)}}>›</Btn>
+  </div>
+
+  {/* This week */}
+  <div style={{ fontSize:13, fontWeight:700, color:'#0D1B3E', marginBottom:8, textTransform:'uppercase', letterSpacing:'0.5px' }}>This Week</div>
+  <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', gap:5, marginBottom:16 }}>
+    {weekDays.map((d,i) => {
+      const shift = myRoster[d] || (isSun(d)?'sunday':currentUser.shift);
+      const isToday = d===todayStr;
+      const sh = SHIFTS[shift] || SHIFTS.morning;
+      return (
+        <div key={d} style={{ borderRadius:12, padding:'8px 3px', textAlign:'center', background:isToday?'#1A3A6B':'#fff', border:`2px solid ${isToday?'#F5C518':'#E8EEFF'}`, boxShadow:isToday?'0 4px 12px rgba(26,58,107,0.3)':'none' }}>
+          <div style={{ fontSize:9, fontWeight:700, color:isToday?'rgba(255,255,255,0.6)':'#5A6A8A', marginBottom:3 }}>{['Mo','Tu','We','Th','Fr','Sa','Su'][i]}</div>
+          <div style={{ fontSize:14, fontWeight:800, color:isToday?'#F5C518':'#0D1B3E', marginBottom:4 }}>{new Date(d).getDate()}</div>
+          <div style={{ ...css.rCell(shift), fontSize:8, margin:'0 auto', display:'block', padding:'2px 1px' }}>{sh.short}</div>
+        </div>
+      );
+    })}
+  </div>
+
+  {/* Full month */}
+  <div style={{ fontSize:13, fontWeight:700, color:'#0D1B3E', marginBottom:8, textTransform:'uppercase', letterSpacing:'0.5px' }}>Full Month</div>
+  <div style={css.card}>
+    {Array.from({length:getDaysInMonth(year,month)}, (_,i) => {
+      const d = `${year}-${String(month+1).padStart(2,'0')}-${String(i+1).padStart(2,'0')}`;
+      const shift = myRoster[d] || (isSun(d)?'sunday':currentUser.shift);
+      const sh = SHIFTS[shift];
+      const dow = new Date(d).toLocaleDateString('en',{weekday:'short'});
+      const isToday = d===todayStr;
+      return (
+        <div key={d} style={{ display:'flex', alignItems:'center', gap:10, padding:'7px 0', borderBottom:'1px solid #F0F4FF', background:isToday?'#FFFBEA':'transparent', borderRadius:isToday?8:0, paddingLeft:isToday?8:0, paddingRight:isToday?8:0 }}>
+          <div style={{ width:24, fontSize:13, fontWeight:800, fontFamily:"'JetBrains Mono',monospace", color:shift==='off'?'#9CA3AF':'#0D1B3E' }}>{i+1}</div>
+          <div style={{ width:28, fontSize:11, color:'#5A6A8A', fontWeight:600 }}>{dow}</div>
+          <ShiftPill shift={shift} />
+          <div style={{ flex:1, fontSize:11, color:'#5A6A8A', marginLeft:6 }}>{sh?.time}</div>
+        </div>
+      );
+    })}
+  </div>
+
+  {/* Export */}
+  <div style={{ ...css.card, marginTop:14 }}>
+    <div style={{ fontSize:13, fontWeight:700, color:'#0D1B3E', marginBottom:10, textTransform:'uppercase', letterSpacing:'0.5px' }}>📲 Export to Calendar</div>
+    <div style={css.formGroup}>
+      <label style={css.label}>Reminder Before Shift</label>
+      <select style={css.input} value={reminder} onChange={e=>setReminder(e.target.value)}>
+        <option value="1440">24 hours before</option>
+        <option value="720">12 hours before</option>
+        <option value="360">6 hours before</option>
+        <option value="180">3 hours before</option>
+        <option value="30">30 minutes before</option>
+      </select>
+    </div>
+    <div style={{ display:'flex', gap:8 }}>
+      <Btn v="ghost" sz="sm" onClick={() => exportICS(weekDays)}>📅 This Week</Btn>
+      <Btn v="yellow" sz="sm" onClick={() => {
+        const all = Array.from({length:getDaysInMonth(year,month)}, (_,i) => `${year}-${String(month+1).padStart(2,'0')}-${String(i+1).padStart(2,'0')}`);
+        exportICS(all);
+      }}>📆 Full Month</Btn>
+    </div>
+    <div style={{ fontSize:11, color:'#5A6A8A', marginTop:8 }}>Works with Apple Calendar, Google Calendar & Outlook</div>
+  </div>
+</div>
+```
+
+);
+}
+
+// ─── SCREEN: SHARE & NOTIFY ───────────────────────────────────────────────────
+
+function ShareScreen({ staff, departments, roster, rosterStatus, currentUser }) {
+const now = new Date();
+const [year, setYear] = useState(now.getFullYear());
+const [month, setMonth] = useState(now.getMonth());
+const [pwModal, setPwModal] = useState(null);
+const [password, setPassword] = useState(’’);
+const [pwErr, setPwErr] = useState(’’);
+const [alert, setAlert] = useState(null);
+const [copied, setCopied] = useState(’’);
+
+const mk = `${year}-${String(month+1).padStart(2,'0')}`;
+const status = rosterStatus[mk];
+const isAdmin = currentUser.id === ADMIN_ID;
+const isSup = currentUser.role === ‘supervisor’;
+const canApprove = isAdmin || isSup;
+const [rStatus, setRStatus] = useState(rosterStatus);
+
+// Use prop rosterStatus for reading, but we need to update parent – handled via setRosterStatus passed as prop
+const deptMap = Object.fromEntries(departments.map(d=>[d.id,d]));
+
+const genMsg = (emp) => {
+const er = roster[mk]?.[emp.id] || {};
+const deptName = deptMap[emp.dept]?.name || emp.dept;
+let msg = `🏪 *Justrite Superstore – ${MONTH_NAMES[month]} ${year}*\n\n`;
+msg += `👤 *${emp.name}*\n📦 ${deptName} | 🕐 ${SHIFTS[emp.shift]?.label}\n\n`;
+const days = getDaysInMonth(year, month);
+for (let i=1; i<=days; i++) {
+const d = `${year}-${String(month+1).padStart(2,'0')}-${String(i).padStart(2,'0')}`;
+const shift = er[d] || (isSun(d)?‘sunday’:emp.shift);
+const dow = new Date(d).toLocaleDateString(‘en’,{weekday:‘short’});
+const em = shift===‘off’?‘🔴’:shift===‘longhour’?‘🟡’:‘🟢’;
+msg += `${em} ${dow} ${i}: ${SHIFTS[shift]?.label||shift}\n`;
+}
+const offs = Object.values(er).filter(s=>s===‘off’).length;
+msg += `\n📊 Days off: ${offs}/6\n_Justrite Superstore Ile-Ife_`;
+return msg;
+};
+
+const copyMsg = (key, text) => {
+navigator.clipboard.writeText(text).then(() => { setCopied(key); setTimeout(()=>setCopied(’’),2000); });
+};
+
+const activeStaff = staff.filter(s=>s.active);
+
+return (
+<div style={css.page}>
+{alert && <Alert type={alert.t}>{alert.msg}</Alert>}
+
+```
+  {/* Month nav */}
+  <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:14 }}>
+    <Btn v="ghost" sz="sm" onClick={()=>{if(month===0){setYear(y=>y-1);setMonth(11)}else setMonth(m=>m-1)}}>‹</Btn>
+    <div style={{ flex:1, textAlign:'center', fontWeight:800, fontSize:17 }}>{MONTH_NAMES[month]} {year}</div>
+    <Btn v="ghost" sz="sm" onClick={()=>{if(month===11){setYear(y=>y+1);setMonth(0)}else setMonth(m=>m+1)}}>›</Btn>
+  </div>
+
+  {/* Approval flow – admin/sup only */}
+  {canApprove && (
+    <div style={css.card}>
+      <div style={{ fontSize:13, fontWeight:700, color:'#0D1B3E', marginBottom:12, textTransform:'uppercase', letterSpacing:'0.5px' }}>Approval & Publish</div>
+      <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:14 }}>
+        {['draft','approved','published'].map((st,i) => (
+          <React.Fragment key={st}>
+            <div style={{ textAlign:'center' }}>
+              <div style={{ width:32, height:32, borderRadius:'50%', background:(['draft','approved','published'].indexOf(status)>=i)?'#1A3A6B':'#E8EEFF', color:(['draft','approved','published'].indexOf(status)>=i)?'#fff':'#5A6A8A', display:'flex', alignItems:'center', justifyContent:'center', fontSize:14, fontWeight:800, margin:'0 auto 4px', border:status===st?'3px solid #F5C518':'none' }}>
+                {i+1}
+              </div>
+              <div style={{ fontSize:10, fontWeight:700, color:status===st?'#0D1B3E':'#5A6A8A', textTransform:'capitalize' }}>{st}</div>
+            </div>
+            {i<2 && <div style={{ flex:1, height:2, background:(['draft','approved','published'].indexOf(status)>i)?'#1A3A6B':'#E8EEFF', borderRadius:1 }} />}
+          </React.Fragment>
+        ))}
+      </div>
+
+      <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
+        {status==='draft' && isAdmin && (
+          <Btn v="primary" sz="sm" onClick={()=>{setPwModal('approve');setPwErr('');setPassword('');}}>✅ Approve Roster</Btn>
+        )}
+        {status==='approved' && isAdmin && (
+          <Btn v="yellow" sz="sm" onClick={()=>{setPwModal('publish');setPwErr('');setPassword('');}}>📢 Publish to Staff</Btn>
+        )}
+        {(status==='approved'||status==='published') && isAdmin && (
+          <Btn v="muted" sz="sm" onClick={()=>{
+            // Override – reset to draft via parent
+            const ev = new CustomEvent('rosterOverride', {detail:{mk}});
+            window.dispatchEvent(ev);
+            setAlert({t:'success',msg:'Roster unlocked.'});
+          }}>🔓 Override Lock</Btn>
+        )}
+        {!status && <div style={{ fontSize:13, color:'#5A6A8A' }}>No roster generated for this month.</div>}
+      </div>
+    </div>
+  )}
+
+  {/* WhatsApp share */}
+  {status==='published' && (
+    <>
+      <div style={{ fontSize:13, fontWeight:700, color:'#0D1B3E', marginBottom:8, textTransform:'uppercase', letterSpacing:'0.5px' }}>💬 WhatsApp Messages</div>
+      <Btn v="yellow" sz="sm" style={{ marginBottom:12, width:'100%' }} onClick={() => {
+        const all = activeStaff.map(s=>genMsg(s)).join('\n\n'+'─'.repeat(30)+'\n\n');
+        copyMsg('all', all);
+      }}>{copied==='all'?'✅ Copied All!':'📋 Copy All Messages'}</Btn>
+
+      {activeStaff.map(s => (
+        <div key={s.id} style={{ ...css.card, padding:'11px 14px', marginBottom:8 }}>
+          <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:8 }}>
+            <Avt name={s.name} size={36} />
+            <div style={{ flex:1 }}>
+              <div style={{ fontWeight:700, fontSize:13 }}>{s.name}</div>
+              <div style={{ fontSize:11, color:'#5A6A8A' }}>{deptMap[s.dept]?.name}</div>
+            </div>
+            <Btn v={copied===s.id?'success':'ghost'} sz="xs" onClick={()=>copyMsg(s.id, genMsg(s))}>
+              {copied===s.id?'✅ Copied':'📋 Copy'}
+            </Btn>
+          </div>
+          <div style={{ background:'#F0F4FF', borderRadius:8, padding:'8px 10px', fontSize:10, fontFamily:"'JetBrains Mono',monospace", color:'#5A6A8A', maxHeight:60, overflow:'hidden', whiteSpace:'pre-wrap' }}>
+            {genMsg(s).slice(0,200)}...
+          </div>
+        </div>
+      ))}
+    </>
+  )}
+
+  {/* PW modal */}
+  <Modal open={!!pwModal} onClose={()=>setPwModal(null)} title={pwModal==='approve'?'Approve Roster':'Publish Roster'}>
+    <p style={{ fontSize:13, color:'#5A6A8A', marginBottom:16 }}>
+      {pwModal==='approve'?'Enter admin password to approve and lock the roster.':'Enter admin password to publish roster to all staff.'}
+    </p>
+    {pwErr && <Alert type="error">{pwErr}</Alert>}
+    <div style={css.formGroup}>
+      <label style={css.label}>Admin Password</label>
+      <input type="password" style={{ ...css.input, fontFamily:"'JetBrains Mono',monospace", letterSpacing:3 }} value={password} onChange={e=>setPassword(e.target.value)} onKeyDown={e=>e.key==='Enter'&&handlePw()} autoFocus />
+    </div>
+    <div style={{ display:'flex', gap:8 }}>
+      <Btn v="outline" onClick={()=>setPwModal(null)}>Cancel</Btn>
+      <Btn v="yellow" style={{ flex:1 }} onClick={() => {
+        if (password !== APPROVAL_PW) { setPwErr('Incorrect password'); return; }
+        const ev = new CustomEvent('rosterStatusChange', {detail:{mk, status:pwModal==='approve'?'approved':'published'}});
+        window.dispatchEvent(ev);
+        setAlert({t:'success', msg:pwModal==='approve'?'Roster approved!':'Roster published to staff!'});
+        setPwModal(null); setPassword(''); setPwErr('');
+      }}>Confirm</Btn>
+    </div>
+  </Modal>
+</div>
+```
+
+);
+}
+
+// ─── SCREEN: TASKS ────────────────────────────────────────────────────────────
+
+function TasksScreen({ staff, departments, currentUser }) {
+const [tasks, setTasks] = useState([
+{
+id:‘T001’, title:‘Monthly Stocktake’, desc:‘Count all items in assigned sections’, depts:[‘groceries’,‘drinks’],
+createdBy:‘ADMIN’, recurring:false,
+steps:[
+{id:‘s1’,title:‘Count Groceries Section’,assignee:‘EMP017’,status:‘done’,by:‘EMP017’,at:‘2025-01-15T09:30:00’,comments:[]},
+{id:‘s2’,title:‘Count Drinks Section’,assignee:‘EMP007’,status:‘pending’,by:null,at:null,comments:[]},
+{id:‘s3’,title:‘Submit Count Sheet’,assignee:‘EMP003’,status:‘pending’,by:null,at:null,comments:[]},
+]
+},
+{
+id:‘T002’, title:‘Window Display Update’, desc:‘Change promotional displays at entrance’, depts:[‘merchandisers’],
+createdBy:‘EMP003’, recurring:true,
+steps:[
+{id:‘s1’,title:‘Remove old displays’,assignee:‘EMP013’,status:‘pending’,by:null,at:null,comments:[]},
+{id:‘s2’,title:‘Install new promo material’,assignee:‘EMP013’,status:‘pending’,by:null,at:null,comments:[]},
+]
+}
+]);
+const [createModal, setCreateModal] = useState(false);
+const [detailModal, setDetailModal] = useState(null);
+const [newForm, setNewForm] = useState({ title:’’, desc:’’, depts:[], steps:[{title:’’,assignee:’’}], recurring:false });
+const [comment, setComment] = useState({});
+const [alert, setAlert] = useState(null);
+
+const isAdmin = currentUser.id===ADMIN_ID;
+const isSup = currentUser.role===‘supervisor’;
+const canCreate = isAdmin || isSup;
+const deptMap = Object.fromEntries(departments.map(d=>[d.id,d]));
+const staffMap = Object.fromEntries(staff.map(s=>[s.id,s]));
+
+const myTasks = tasks.filter(t => {
+if (isAdmin||isSup) return true;
+return t.steps.some(s=>s.assignee===currentUser.id) || t.depts.includes(currentUser.dept);
+});
+
+const prog = (t) => {
+const done = t.steps.filter(s=>s.status===‘done’).length;
+return { done, total:t.steps.length, pct:Math.round((done/t.steps.length)*100) };
+};
+
+const completeStep = (taskId, stepId) => {
+setTasks(p => p.map(t => t.id!==taskId ? t : {
+…t, steps: t.steps.map(s => s.id!==stepId ? s : { …s, status:‘done’, by:currentUser.id, at:new Date().toISOString() })
+}));
+};
+
+const addComment = (taskId, stepId) => {
+const txt = comment[stepId]?.trim();
+if (!txt) return;
+setTasks(p => p.map(t => t.id!==taskId ? t : {
+…t, steps: t.steps.map(s => s.id!==stepId ? s : { …s, comments:[…s.comments,{text:txt,by:currentUser.id,at:new Date().toISOString()}] })
+}));
+setComment(c=>({…c,[stepId]:’’}));
+};
+
+const createTask = () => {
+if (!newForm.title.trim()) { setAlert({t:‘error’,msg:‘Title required’}); return; }
+if (newForm.steps.some(s=>!s.title.trim())) { setAlert({t:‘error’,msg:‘All steps need a title’}); return; }
+const t = {
+id:`T${String(tasks.length+1).padStart(3,'0')}`,
+title:newForm.title, desc:newForm.desc, depts:newForm.depts,
+createdBy:currentUser.id, recurring:newForm.recurring,
+steps: newForm.steps.map((s,i)=>({id:`s${i+1}`,title:s.title,assignee:s.assignee,status:‘pending’,by:null,at:null,comments:[]}))
+};
+setTasks(p=>[t,…p]);
+setCreateModal(false);
+setNewForm({title:’’,desc:’’,depts:[],steps:[{title:’’,assignee:’’}],recurring:false});
+setAlert({t:‘success’,msg:‘Task created!’});
+};
+
+// Step locked if previous not done
+const stepLocked = (t, idx) => idx>0 && t.steps[idx-1].status!==‘done’;
+
+return (
+<div style={css.page}>
+{alert && <Alert type={alert.t}>{alert.msg}</Alert>}
+
+```
+  <div style={css.sh}>
+    <span>Tasks ({myTasks.length})</span>
+    {canCreate && <Btn v="yellow" sz="sm" onClick={()=>setCreateModal(true)}>+ Create Task</Btn>}
+  </div>
+
+  {myTasks.map(t => {
+    const p = prog(t);
+    return (
+      <div key={t.id} style={{ ...css.card, cursor:'pointer' }} onClick={()=>setDetailModal(t.id)}>
+        <div style={{ display:'flex', gap:10, marginBottom:8 }}>
+          <div style={{ flex:1 }}>
+            <div style={{ fontWeight:700, fontSize:14 }}>{t.title}</div>
+            <div style={{ fontSize:12, color:'#5A6A8A', marginTop:2 }}>{t.desc}</div>
+          </div>
+          <div style={{ fontSize:12, fontFamily:"'JetBrains Mono',monospace", fontWeight:700, background:p.done===p.total?'#DCFCE7':'#FEF3C7', color:p.done===p.total?'#16A34A':'#D97706', padding:'4px 10px', borderRadius:8, whiteSpace:'nowrap', alignSelf:'flex-start' }}>
+            {p.done}/{p.total}
+          </div>
+        </div>
+        <div style={{ height:5, background:'#E8EEFF', borderRadius:3, overflow:'hidden', marginBottom:8 }}>
+          <div style={{ height:'100%', width:`${p.pct}%`, background:p.done===p.total?'#16A34A':'#F5C518', borderRadius:3, transition:'width 0.3s' }} />
+        </div>
+        <div style={{ display:'flex', gap:5, flexWrap:'wrap' }}>
+          {t.depts.map(d => <span key={d} style={{ fontSize:10, fontWeight:700, background:(deptMap[d]?.color||'#999')+'20', color:deptMap[d]?.color||'#999', padding:'2px 8px', borderRadius:6 }}>{deptMap[d]?.name||d}</span>)}
+          {t.recurring && <span style={{ fontSize:10, fontWeight:700, background:'#E8EEFF', color:'#1A3A6B', padding:'2px 8px', borderRadius:6 }}>↻ Recurring</span>}
+        </div>
+      </div>
+    );
+  })}
+
+  {myTasks.length===0 && (
+    <div style={{ textAlign:'center', padding:'50px 20px', color:'#5A6A8A' }}>
+      <div style={{ fontSize:40, marginBottom:12 }}>📋</div>
+      <div style={{ fontWeight:700 }}>No tasks assigned yet</div>
+    </div>
+  )}
+
+  {/* Detail modal */}
+  {detailModal && (() => {
+    const t = tasks.find(x=>x.id===detailModal);
+    if (!t) return null;
+    return (
+      <Modal open={true} onClose={()=>setDetailModal(null)} title={t.title}>
+        <p style={{ fontSize:13, color:'#5A6A8A', marginBottom:16 }}>{t.desc}</p>
+        {t.steps.map((step,idx) => {
+          const locked = stepLocked(t, idx);
+          const isDone = step.status==='done';
+          const canDo = !locked && !isDone && (step.assignee===currentUser.id || isAdmin || isSup);
+          const assignee = staffMap[step.assignee];
+          return (
+            <div key={step.id} style={{ padding:'12px', borderRadius:12, border:`2px solid ${isDone?'#86EFAC':locked?'#E8EEFF':'#D4DCF0'}`, background:isDone?'#F0FDF4':locked?'#FAFBFF':'#fff', marginBottom:8 }}>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:8, marginBottom:isDone?6:10 }}>
+                <div>
+                  <div style={{ fontWeight:700, fontSize:13, color:locked?'#9CA3AF':'#0D1B3E' }}>
+                    {locked?'🔒':isDone?'✅':(`${idx+1}.`)} {step.title}
+                  </div>
+                  {assignee && <div style={{ fontSize:11, color:'#5A6A8A', marginTop:2 }}>→ {assignee.name}</div>}
+                </div>
+                {canDo && <Btn v="yellow" sz="xs" onClick={()=>completeStep(t.id,step.id)}>✓ Done</Btn>}
+              </div>
+              {isDone && (
+                <div style={{ fontSize:10, color:'#16A34A', fontFamily:"'JetBrains Mono',monospace" }}>
+                  ✅ {staffMap[step.by]?.name||step.by} • {step.at?new Date(step.at).toLocaleString():''}
+                </div>
+              )}
+              {step.comments.map((c,ci) => (
+                <div key={ci} style={{ fontSize:11, marginTop:6, padding:'5px 8px', background:'#F0F4FF', borderRadius:8 }}>
+                  <span style={{ fontWeight:700 }}>{staffMap[c.by]?.name?.split(' ')[0]||c.by}:</span> {c.text}
+                </div>
+              ))}
+              {!locked && (
+                <div style={{ display:'flex', gap:6, marginTop:8 }}>
+                  <input style={{ ...css.input, flex:1, padding:'6px 10px', fontSize:12 }} placeholder="Add comment…" value={comment[step.id]||''} onChange={e=>setComment(c=>({...c,[step.id]:e.target.value}))} onKeyDown={e=>e.key==='Enter'&&addComment(t.id,step.id)} />
+                  <Btn v="ghost" sz="xs" onClick={()=>addComment(t.id,step.id)}>💬</Btn>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </Modal>
+    );
+  })()}
+
+  {/* Create modal */}
+  <Modal open={createModal} onClose={()=>{setCreateModal(false);setAlert(null);}} title="Create Task">
+    {alert && <Alert type={alert.t}>{alert.msg}</Alert>}
+    <div style={css.formGroup}>
+      <label style={css.label}>Title *</label>
+      <input style={css.input} value={newForm.title} onChange={e=>setNewForm(f=>({...f,title:e.target.value}))} placeholder="Task title" />
+    </div>
+    <div style={css.formGroup}>
+      <label style={css.label}>Description</label>
+      <input style={css.input} value={newForm.desc} onChange={e=>setNewForm(f=>({...f,desc:e.target.value}))} placeholder="Optional details" />
+    </div>
+    <div style={css.formGroup}>
+      <label style={css.label}>Departments</label>
+      <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
+        {departments.map(d => (
+          <button key={d.id} onClick={()=>setNewForm(f=>({...f,depts:f.depts.includes(d.id)?f.depts.filter(x=>x!==d.id):[...f.depts,d.id]}))}
+            style={{ padding:'4px 10px', borderRadius:8, border:`2px solid ${newForm.depts.includes(d.id)?d.color:'#D4DCF0'}`, background:newForm.depts.includes(d.id)?d.color+'20':'#fff', color:newForm.depts.includes(d.id)?d.color:'#5A6A8A', fontSize:12, fontWeight:700, cursor:'pointer' }}>
+            {d.name}
+          </button>
+        ))}
+      </div>
+    </div>
+    <div style={{ fontSize:12, fontWeight:700, color:'#5A6A8A', marginBottom:8, textTransform:'uppercase', letterSpacing:'0.5px' }}>Steps (locked until previous complete)</div>
+    {newForm.steps.map((step,i) => (
+      <div key={i} style={{ display:'flex', gap:6, marginBottom:8 }}>
+        <div style={{ fontWeight:800, color:'#5A6A8A', paddingTop:10, fontSize:12, minWidth:18 }}>{i+1}.</div>
+        <div style={{ flex:1, display:'flex', flexDirection:'column', gap:4 }}>
+          <input style={css.input} value={step.title} onChange={e=>setNewForm(f=>({...f,steps:f.steps.map((s,j)=>j===i?{...s,title:e.target.value}:s)}))} placeholder={`Step ${i+1}`} />
+          <select style={css.input} value={step.assignee} onChange={e=>setNewForm(f=>({...f,steps:f.steps.map((s,j)=>j===i?{...s,assignee:e.target.value}:s)}))}>
+            <option value="">Assign to… (optional)</option>
+            {staff.filter(s=>s.active).map(s=><option key={s.id} value={s.id}>{s.name}</option>)}
+          </select>
+        </div>
+        {newForm.steps.length>1 && <Btn v="muted" sz="xs" onClick={()=>setNewForm(f=>({...f,steps:f.steps.filter((_,j)=>j!==i)}))}>✕</Btn>}
+      </div>
+    ))}
+    <Btn v="ghost" sz="sm" onClick={()=>setNewForm(f=>({...f,steps:[...f.steps,{title:'',assignee:''}]}))} style={{ marginBottom:14 }}>+ Add Step</Btn>
+    <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:16 }}>
+      <input type="checkbox" id="rec" checked={newForm.recurring} onChange={e=>setNewForm(f=>({...f,recurring:e.target.checked}))} style={{ width:16,height:16 }} />
+      <label htmlFor="rec" style={{ fontSize:13, fontWeight:600, cursor:'pointer', color:'#0D1B3E' }}>Recurring assignment</label>
+    </div>
+    <div style={{ display:'flex', gap:8 }}>
+      <Btn v="outline" onClick={()=>{setCreateModal(false);setAlert(null);}}>Cancel</Btn>
+      <Btn v="yellow" onClick={createTask} style={{ flex:1 }}>Create Task</Btn>
+    </div>
+  </Modal>
+</div>
+```
+
+);
+}
+
+// ─── SCREEN: MONTHLY BOARD (full roster grid for everyone) ────────────────────
+
+function MonthlyBoardScreen({ staff, departments, roster, rosterStatus, currentUser }) {
+const now = new Date();
+const [year, setYear] = useState(now.getFullYear());
+const [month, setMonth] = useState(now.getMonth());
+const [filterDept, setFilterDept] = useState(’’);
+const [filterShift, setFilterShift] = useState(’’);
+const [highlight, setHighlight] = useState(’’); // highlight a shift type
+const [selectedCell, setSelectedCell] = useState(null); // {name, date, shift}
+
+const mk = `${year}-${String(month+1).padStart(2,'0')}`;
+const monthRoster = roster[mk] || {};
+const status = rosterStatus[mk];
+const days = getDaysInMonth(year, month);
+const daysArr = Array.from({ length: days }, (_, i) =>
+`${year}-${String(month+1).padStart(2,'0')}-${String(i+1).padStart(2,'0')}`
+);
+const todayStr = fmtDate(now);
+
+const deptMap = useMemo(() => Object.fromEntries(departments.map(d => [d.id, d])), [departments]);
+
+const activeStaff = useMemo(() => staff.filter(s => {
+if (!s.active) return false;
+if (filterDept && s.dept !== filterDept) return false;
+if (filterShift && s.shift !== filterShift) return false;
+return true;
+}), [staff, filterDept, filterShift]);
+
+// Group by department
+const grouped = useMemo(() => {
+const g = {};
+activeStaff.forEach(s => {
+if (!g[s.dept]) g[s.dept] = [];
+g[s.dept].push(s);
+});
+return g;
+}, [activeStaff]);
+
+const getDow = (ds) => (new Date(ds).getDay() + 6) % 7;
+const isWeekend = (ds) => { const d = new Date(ds).getDay(); return d === 0 || d === 6; };
+
+// Coverage count per day per dept+shift
+const coverage = useMemo(() => {
+const result = {};
+daysArr.forEach(d => {
+result[d] = {};
+departments.forEach(dept => {
+const deptStaff = staff.filter(s => s.active && s.dept === dept.id);
+[‘morning’,‘afternoon’].forEach(sh => {
+const shiftStaff = deptStaff.filter(s => s.shift === sh);
+const working = shiftStaff.filter(s => {
+const v = monthRoster[s.id]?.[d] || (isSun(d) ? ‘sunday’ : s.shift);
+return v !== ‘off’;
+}).length;
+result[d][`${dept.id}_${sh}`] = { total: shiftStaff.length, working };
+});
+});
+});
+return result;
+}, [daysArr, departments, staff, monthRoster]);
+
+const hasRoster = Object.keys(monthRoster).length > 0;
+
+return (
+<div style={{ display:‘flex’, flexDirection:‘column’, height:‘100%’ }}>
+{/* Controls bar */}
+<div style={{ background:’#fff’, borderBottom:‘1px solid #E8EEFF’, padding:‘12px 14px’, position:‘sticky’, top:0, zIndex:50 }}>
+{/* Month nav */}
+<div style={{ display:‘flex’, alignItems:‘center’, gap:8, marginBottom:10 }}>
+<Btn v=“ghost” sz=“sm” onClick={() => { if (month===0){setYear(y=>y-1);setMonth(11)}else setMonth(m=>m-1); }}>‹</Btn>
+<div style={{ flex:1, textAlign:‘center’, fontWeight:800, fontSize:16 }}>{MONTH_NAMES[month]} {year}</div>
+<Btn v=“ghost” sz=“sm” onClick={() => { if (month===11){setYear(y=>y+1);setMonth(0)}else setMonth(m=>m+1); }}>›</Btn>
+</div>
+
+```
+    {/* Status + filters */}
+    <div style={{ display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
+      {/* Status pill */}
+      <div style={{ padding:'4px 10px', borderRadius:8, fontSize:11, fontWeight:700,
+        background: status==='published'?'#DCFCE7':status==='approved'?'#DBEAFE':status==='draft'?'#FEF3C7':'#F1F5F9',
+        color: status==='published'?'#16A34A':status==='approved'?'#1D4ED8':status==='draft'?'#D97706':'#64748B' }}>
+        {status ? `● ${status.toUpperCase()}` : '○ NOT GENERATED'}
+      </div>
+
+      <select style={{ ...css.input, flex:1, minWidth:90, padding:'6px 8px', fontSize:12 }} value={filterDept} onChange={e=>setFilterDept(e.target.value)}>
+        <option value="">All Depts</option>
+        {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+      </select>
+
+      <select style={{ ...css.input, width:'auto', padding:'6px 8px', fontSize:12 }} value={filterShift} onChange={e=>setFilterShift(e.target.value)}>
+        <option value="">All</option>
+        <option value="morning">Mor</option>
+        <option value="afternoon">Aft</option>
+      </select>
+
+      {/* Highlight filter */}
+      <select style={{ ...css.input, width:'auto', padding:'6px 8px', fontSize:12 }} value={highlight} onChange={e=>setHighlight(e.target.value)}>
+        <option value="">Highlight…</option>
+        {Object.entries(SHIFTS).map(([k,v]) => <option key={k} value={k}>{v.short}</option>)}
+      </select>
+    </div>
+  </div>
+
+  {!hasRoster ? (
+    <div style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:40, color:'#5A6A8A', textAlign:'center' }}>
+      <div style={{ fontSize:52, marginBottom:16 }}>📋</div>
+      <div style={{ fontSize:18, fontWeight:800, color:'#0D1B3E', marginBottom:8 }}>No Roster Generated</div>
+      <div style={{ fontSize:14 }}>Go to the <strong>Roster</strong> tab to generate the {MONTH_NAMES[month]} {year} roster.</div>
+    </div>
+  ) : (
+    <div style={{ flex:1, overflowX:'auto', overflowY:'auto' }}>
+      {/* THE BIG GRID */}
+      <table style={{ borderCollapse:'collapse', minWidth:'100%', fontSize:10 }}>
+        <thead style={{ position:'sticky', top:0, zIndex:30 }}>
+          {/* Dept group header row */}
+          <tr>
+            <th style={{ minWidth:130, maxWidth:130, padding:'6px 8px', background:'#1A3A6B', color:'#fff', textAlign:'left', position:'sticky', left:0, zIndex:40, fontWeight:800, fontSize:11 }}>
+              STAFF
+            </th>
+            {daysArr.map(d => {
+              const dow = getDow(d);
+              const dayN = new Date(d).getDate();
+              const isTod = d === todayStr;
+              const isSunday = new Date(d).getDay() === 0;
+              const isSat = new Date(d).getDay() === 6;
+              return (
+                <th key={d} style={{
+                  minWidth: 30, padding:'3px 1px', textAlign:'center',
+                  background: isTod ? '#F5C518' : isSunday ? '#FEF3C7' : isSat ? '#F8FAFC' : '#1A3A6B',
+                  color: isTod ? '#0D1B3E' : isSunday ? '#D97706' : '#fff',
+                  borderLeft: isTod ? '2px solid #D4A800' : '1px solid rgba(255,255,255,0.1)',
+                  fontFamily:"'JetBrains Mono',monospace", position:'sticky', top:0, zIndex:25
+                }}>
+                  <div style={{ fontSize:8, opacity:0.75, lineHeight:1.2 }}>{['Mo','Tu','We','Th','Fr','Sa','Su'][dow]}</div>
+                  <div style={{ fontWeight:800, fontSize:11, lineHeight:1.2 }}>{dayN}</div>
+                </th>
+              );
+            })}
+            <th style={{ minWidth:44, padding:'4px 6px', background:'#1A3A6B', color:'rgba(255,255,255,0.7)', fontSize:9, fontWeight:700, textAlign:'center', position:'sticky', right:0, zIndex:26 }}>OFFS</th>
+          </tr>
+        </thead>
+        <tbody>
+          {/* Render grouped by department */}
+          {Object.entries(grouped).map(([deptId, deptStaff]) => {
+            const dept = deptMap[deptId];
+            if (!dept) return null;
+            return (
+              <React.Fragment key={deptId}>
+                {/* Dept separator row */}
+                <tr>
+                  <td colSpan={daysArr.length + 2} style={{
+                    padding:'5px 10px', background: dept.color + '18',
+                    borderTop:`3px solid ${dept.color}`, borderBottom:`1px solid ${dept.color}30`
+                  }}>
+                    <span style={{ fontSize:11, fontWeight:800, color: dept.color, textTransform:'uppercase', letterSpacing:'0.8px' }}>
+                      {dept.name}
+                    </span>
+                    <span style={{ fontSize:10, color:'#5A6A8A', marginLeft:8 }}>
+                      {deptStaff.length} staff
+                    </span>
+                  </td>
+                </tr>
+
+                {/* Staff rows */}
+                {deptStaff.map((s, sIdx) => {
+                  const empRoster = monthRoster[s.id] || {};
+                  const offs = Object.values(empRoster).filter(v=>v==='off').length;
+                  const rowBg = sIdx % 2 === 0 ? '#fff' : '#FAFBFF';
+                  return (
+                    <tr key={s.id} style={{ background: rowBg }}>
+                      {/* Sticky name column */}
+                      <td style={{
+                        padding:'5px 8px', position:'sticky', left:0, zIndex:10,
+                        background: rowBg, borderRight:`3px solid ${dept.color}40`,
+                        minWidth:130, maxWidth:130
+                      }}>
+                        <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                          <Avt name={s.name} size={26} />
+                          <div style={{ minWidth:0 }}>
+                            <div style={{ fontWeight:700, fontSize:11, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', maxWidth:84 }}>{s.name.split(' ')[0]}</div>
+                            <div style={{ fontSize:9, color: dept.color, fontWeight:600, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', maxWidth:84 }}>{s.name.split(' ').slice(1).join(' ')}</div>
+                          </div>
+                        </div>
+                      </td>
+
+                      {/* Day cells */}
+                      {daysArr.map(d => {
+                        const shift = empRoster[d] || (isSun(d) ? 'sunday' : s.shift);
+                        const sh = SHIFTS[shift] || SHIFTS.morning;
+                        const isTod = d === todayStr;
+                        const dimmed = highlight && shift !== highlight;
+                        return (
+                          <td key={d}
+                            onClick={() => setSelectedCell({ name: s.name, dept: dept.name, date: d, shift, shiftInfo: sh })}
+                            style={{
+                              padding:'2px 1px', textAlign:'center',
+                              borderLeft: isTod ? '2px solid #F5C518' : '1px solid #EEF0F8',
+                              cursor:'pointer', verticalAlign:'middle'
+                            }}>
+                            <div style={{
+                              borderRadius:6, padding:'3px 1px', margin:'1px',
+                              background: dimmed ? '#F8F9FB' : sh.bg,
+                              color: dimmed ? '#CBD5E1' : sh.fg,
+                              fontFamily:"'JetBrains Mono',monospace",
+                              fontWeight:800, fontSize:8.5,
+                              opacity: dimmed ? 0.4 : 1,
+                              outline: isTod ? `2px solid #F5C518` : 'none',
+                              transition:'opacity 0.15s'
+                            }}>
+                              {sh.short}
+                            </div>
+                          </td>
+                        );
+                      })}
+
+                      {/* Offs summary */}
+                      <td style={{
+                        padding:'4px 6px', textAlign:'center',
+                        position:'sticky', right:0, zIndex:10,
+                        background: rowBg, borderLeft:'2px solid #E8EEFF',
+                        fontFamily:"'JetBrains Mono',monospace",
+                        fontSize:10, fontWeight:800,
+                        color: offs >= 6 ? '#16A34A' : offs >= 4 ? '#D97706' : '#DC2626'
+                      }}>
+                        {offs}/6
+                      </td>
+                    </tr>
+                  );
+                })}
+
+                {/* Coverage summary row */}
+                <tr>
+                  <td style={{ padding:'4px 8px', position:'sticky', left:0, zIndex:10, background:'#F8FAFF', borderTop:'1px dashed #D4DCF0', borderRight:`3px solid ${dept.color}40` }}>
+                    <div style={{ fontSize:9, fontWeight:700, color:'#5A6A8A', textTransform:'uppercase' }}>Coverage</div>
+                  </td>
+                  {daysArr.map(d => {
+                    const morCov = coverage[d]?.[`${deptId}_morning`];
+                    const aftCov = coverage[d]?.[`${deptId}_afternoon`];
+                    const isTod = d === todayStr;
+                    const morPct = morCov?.total > 0 ? morCov.working / morCov.total : 1;
+                    const aftPct = aftCov?.total > 0 ? aftCov.working / aftCov.total : 1;
+                    const minPct = Math.min(morPct, aftPct);
+                    return (
+                      <td key={d} style={{ padding:'2px 1px', textAlign:'center', background:'#F8FAFF', borderLeft: isTod ? '2px solid #F5C518' : '1px solid #EEF0F8', borderTop:'1px dashed #D4DCF0' }}>
+                        <div style={{
+                          width:28, height:6, background:'#E8EEFF', borderRadius:3,
+                          overflow:'hidden', margin:'0 auto 1px'
+                        }}>
+                          <div style={{ height:'100%', width:`${Math.round(morPct*100)}%`, background: morPct >= 0.5 ? '#1D4ED8' : '#DC2626', borderRadius:3 }} />
+                        </div>
+                        <div style={{
+                          width:28, height:6, background:'#E8EEFF', borderRadius:3,
+                          overflow:'hidden', margin:'0 auto'
+                        }}>
+                          <div style={{ height:'100%', width:`${Math.round(aftPct*100)}%`, background: aftPct >= 0.5 ? '#7C3AED' : '#DC2626', borderRadius:3 }} />
+                        </div>
+                      </td>
+                    );
+                  })}
+                  <td style={{ background:'#F8FAFF', borderTop:'1px dashed #D4DCF0', position:'sticky', right:0, zIndex:10 }} />
+                </tr>
+              </React.Fragment>
+            );
+          })}
+        </tbody>
+      </table>
+
+      {/* Legend + info */}
+      <div style={{ padding:'12px 14px 8px', background:'#fff', borderTop:'1px solid #E8EEFF' }}>
+        <div style={{ fontSize:11, fontWeight:700, color:'#5A6A8A', marginBottom:8, textTransform:'uppercase', letterSpacing:'0.5px' }}>Legend</div>
+        <div style={{ display:'flex', flexWrap:'wrap', gap:8, marginBottom:8 }}>
+          {Object.entries(SHIFTS).map(([k,v]) => (
+            <div key={k} style={{ display:'flex', alignItems:'center', gap:4, cursor:'pointer' }} onClick={() => setHighlight(h => h===k?'':k)}>
+              <span style={{ ...css.shiftBadge(k), fontSize:9, padding:'2px 6px', outline: highlight===k?'2px solid #1A3A6B':'none' }}>{v.short}</span>
+              <span style={{ fontSize:11, color:'#5A6A8A' }}>{v.label} · {v.time}</span>
+            </div>
+          ))}
+        </div>
+        <div style={{ fontSize:10, color:'#5A6A8A' }}>
+          Tap a cell to see details · Tap a legend item to highlight that shift
+        </div>
+        <div style={{ display:'flex', gap:10, marginTop:8, fontSize:10, color:'#5A6A8A' }}>
+          <span>Coverage bars: <span style={{ color:'#1D4ED8', fontWeight:700 }}>█ Morning</span> / <span style={{ color:'#7C3AED', fontWeight:700 }}>█ Afternoon</span> — red = below 50%</span>
+        </div>
+      </div>
+    </div>
+  )}
+
+  {/* Cell detail modal */}
+  <Modal open={!!selectedCell} onClose={() => setSelectedCell(null)} title="Shift Detail">
+    {selectedCell && (
+      <div>
+        <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:16 }}>
+          <Avt name={selectedCell.name} size={48} />
+          <div>
+            <div style={{ fontWeight:800, fontSize:16 }}>{selectedCell.name}</div>
+            <div style={{ fontSize:13, color:'#5A6A8A', marginTop:2 }}>{selectedCell.dept}</div>
+          </div>
+        </div>
+        <div style={{ background:'#F0F4FF', borderRadius:12, padding:'14px 16px' }}>
+          <div style={{ fontSize:12, color:'#5A6A8A', marginBottom:4, fontWeight:600 }}>
+            {new Date(selectedCell.date).toLocaleDateString('en', { weekday:'long', day:'numeric', month:'long', year:'numeric' })}
+          </div>
+          <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+            <span style={{ ...css.shiftBadge(selectedCell.shift), fontSize:14, padding:'6px 14px' }}>{selectedCell.shiftInfo.short}</span>
+            <div>
+              <div style={{ fontWeight:800, fontSize:16 }}>{selectedCell.shiftInfo.label}</div>
+              <div style={{ fontSize:13, color:'#5A6A8A' }}>{selectedCell.shiftInfo.time}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    )}
+  </Modal>
+</div>
+```
+
+);
+}
+
+// ─── APP ROOT ─────────────────────────────────────────────────────────────────
+
+export default function App() {
+const now = new Date();
+const [user, setUser] = useState(null);
+const [tab, setTab] = useState(‘roster’);
+const [staff, setStaff] = useState(STAFF_INIT);
+const [departments] = useState(DEPT_INIT);
+const [roster, setRoster] = useState({});
+const [rosterStatus, setRosterStatus] = useState({});
+
+// Listen for roster status events from ShareScreen (event bus pattern)
+React.useEffect(() => {
+const handleChange = (e) => {
+setRosterStatus(p => ({ …p, [e.detail.mk]: e.detail.status }));
+};
+const handleOverride = (e) => {
+setRosterStatus(p => ({ …p, [e.detail.mk]: ‘draft’ }));
+};
+window.addEventListener(‘rosterStatusChange’, handleChange);
+window.addEventListener(‘rosterOverride’, handleOverride);
+return () => {
+window.removeEventListener(‘rosterStatusChange’, handleChange);
+window.removeEventListener(‘rosterOverride’, handleOverride);
+};
+}, []);
+
+const login = (id) => {
+if (id === ADMIN_ID) {
+setUser({ id: ADMIN_ID, name: ‘Admin’, dept: ‘cashier’, shift: ‘morning’, role: ‘admin’, active: true, supOf: [] });
+setTab(‘board’);
+return true;
+}
+const found = staff.find(s => s.id === id);
+if (found) { setUser(found); setTab(‘schedule’); return true; }
+return false;
+};
+
+if (!user) return <LoginScreen onLogin={login} />;
+
+const isAdmin = user.id === ADMIN_ID;
+const isSup = user.role === ‘supervisor’;
+const canManage = isAdmin || isSup;
+
+// Tabs
+const tabs = [
+{ id: ‘schedule’,  icon: ‘📅’, label: ‘Schedule’ },
+{ id: ‘board’,     icon: ‘📊’, label: ‘Monthly Board’ },
+{ id: ‘roster’,    icon: ‘🗓’, label: ‘Roster’ },
+{ id: ‘directory’, icon: ‘👥’, label: ‘Directory’ },
+{ id: ‘share’,     icon: ‘📤’, label: ‘Share & Notify’ },
+{ id: ‘tasks’,     icon: ‘📋’, label: ‘Tasks’ },
+];
+
+// Show roster month name
+const mk = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+
+return (
+<div style={{ minHeight:‘100vh’, background:’#F0F4FF’, display:‘flex’, flexDirection:‘column’ }}>
+{/* ── HEADER ── */}
+<div style={{ background:‘linear-gradient(135deg,#1A3A6B 0%,#2352A0 100%)’, color:’#fff’, position:‘sticky’, top:0, zIndex:100 }}>
+{/* Brand bar */}
+<div style={{ display:‘flex’, alignItems:‘center’, gap:12, padding:‘12px 16px 0’ }}>
+<div style={{ width:46, height:46, background:’#F5C518’, borderRadius:13, display:‘flex’, alignItems:‘center’, justifyContent:‘center’, fontSize:22, boxShadow:‘0 4px 12px rgba(245,197,24,0.4)’, flexShrink:0 }}>🛒</div>
+<div style={{ flex:1, minWidth:0 }}>
+<div style={{ fontWeight:900, fontSize:18, letterSpacing:’-0.3px’, lineHeight:1.1 }}>Justrite Superstore</div>
+<div style={{ fontSize:10, opacity:0.55, letterSpacing:‘2px’, fontFamily:”‘JetBrains Mono’,monospace” }}>ILE-IFE · {canManage?‘ROSTER SYSTEM’:‘STAFF PORTAL’}</div>
+</div>
+<div style={{ display:‘flex’, gap:6, alignItems:‘center’ }}>
+{canManage && (
+<Btn v=“yellow” sz=“xs” onClick={() => { const mo = document.getElementById(‘addStaffQuick’); if(mo) mo.click(); }} style={{ display:‘none’ }}>
++ Add
+</Btn>
+)}
+<div onClick={()=>setUser(null)} style={{ cursor:‘pointer’, background:‘rgba(255,255,255,0.12)’, borderRadius:10, padding:‘6px 10px’, fontSize:12, fontWeight:700, border:‘1px solid rgba(255,255,255,0.2)’ }}>
+<Avt name={user.name} size={24} />
+</div>
+</div>
+</div>
+
+```
+    {/* Top action row (admin/sup) */}
+    {canManage && (
+      <div style={{ display:'flex', gap:8, padding:'8px 16px 0', justifyContent:'flex-end' }}>
+        <div style={{ fontSize:12, opacity:0.5, marginRight:'auto', paddingTop:2, fontFamily:"'JetBrains Mono',monospace" }}>{user.name.split(' ')[0]}</div>
+        <Btn v="yellow" sz="xs" onClick={()=>{ setTab('board'); }}>📊 Board</Btn>
+        <Btn v="yellow" sz="xs" onClick={()=>{ setTab('roster'); }}>🗓 Roster</Btn>
+        <Btn v="outline" sz="xs" style={{ borderColor:'rgba(255,255,255,0.3)', color:'#fff' }} onClick={()=>{ setTab('share'); }}>📤 Share</Btn>
+      </div>
+    )}
+
+    {/* Nav tabs */}
+    <div style={{ display:'flex', overflowX:'auto', marginTop:8, gap:0 }}>
+      {tabs.map(t => (
+        <button key={t.id} onClick={()=>setTab(t.id)}
+          style={{ flex:'0 0 auto', padding:'10px 14px 14px', border:'none', cursor:'pointer', fontFamily:"'Sora',sans-serif", fontWeight:700, fontSize:12, whiteSpace:'nowrap', background:'transparent', color: tab===t.id ? '#F5C518' : 'rgba(255,255,255,0.55)', borderBottom: tab===t.id ? '3px solid #F5C518' : '3px solid transparent', transition:'all 0.15s', letterSpacing:'0.2px' }}>
+          {t.icon} {t.label}
+        </button>
+      ))}
+    </div>
+  </div>
+
+  {/* ── CONTENT ── */}
+  <div style={{ flex:1 }}>
+    {tab==='schedule' && <MyScheduleScreen currentUser={user} staff={staff} departments={departments} roster={roster} rosterStatus={rosterStatus} />}
+    {tab==='board' && <MonthlyBoardScreen staff={staff} departments={departments} roster={roster} rosterStatus={rosterStatus} currentUser={user} />}
+    {tab==='roster' && <RosterScreen staff={staff} setStaff={setStaff} departments={departments} roster={roster} setRoster={setRoster} rosterStatus={rosterStatus} setRosterStatus={setRosterStatus} currentUser={user} />}
+    {tab==='directory' && <DirectoryScreen staff={staff} setStaff={setStaff} departments={departments} />}
+    {tab==='share' && <ShareScreen staff={staff} departments={departments} roster={roster} rosterStatus={rosterStatus} currentUser={user} />}
+    {tab==='tasks' && <TasksScreen staff={staff} departments={departments} currentUser={user} />}
+  </div>
+
+  {/* ── BOTTOM SIGN OUT FOOTER ── */}
+  <div style={{ padding:'12px 16px 28px', background:'#fff', borderTop:'1px solid #E8EEFF', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+    <div>
+      <div style={{ fontSize:12, fontWeight:700, color:'#0D1B3E' }}>{user.name}</div>
+      <div style={{ fontSize:10, color:'#5A6A8A', fontFamily:"'JetBrains Mono',monospace" }}>{user.id} · {user.role}</div>
+    </div>
+    <Btn v="muted" sz="sm" onClick={()=>setUser(null)}>Sign Out</Btn>
+  </div>
+</div>
+```
+
+);
+}
