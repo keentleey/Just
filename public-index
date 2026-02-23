@@ -1,1 +1,55 @@
+<!DOCTYPE html>
 
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+    <meta name="theme-color" content="#1A3A6B" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <title>Justrite Superstore – Staff Portal</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+    <style>
+      *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+      html { -webkit-text-size-adjust: 100%; }
+      body {
+        font-family: 'Sora', sans-serif;
+        background: #F0F4FF;
+        color: #0D1B3E;
+        min-height: 100vh;
+        overflow-x: hidden;
+      }
+      #root { min-height: 100vh; display: flex; flex-direction: column; }
+      :root {
+        --blue: #1A3A6B;
+        --blue-mid: #2352A0;
+        --blue-light: #E8EEFF;
+        --blue-pale: #F0F4FF;
+        --yellow: #F5C518;
+        --yellow-dark: #D4A800;
+        --yellow-light: #FFFBEA;
+        --yellow-pale: #FFF8D6;
+        --white: #ffffff;
+        --text: #0D1B3E;
+        --text-muted: #5A6A8A;
+        --border: #D4DCF0;
+        --danger: #E53E3E;
+        --success: #16A34A;
+        --mono: 'JetBrains Mono', monospace;
+        --radius: 14px;
+        --shadow: 0 2px 12px rgba(26,58,107,0.10);
+        --shadow-lg: 0 8px 32px rgba(26,58,107,0.15);
+      }
+      ::-webkit-scrollbar { width: 3px; height: 3px; }
+      ::-webkit-scrollbar-track { background: transparent; }
+      ::-webkit-scrollbar-thumb { background: var(--yellow); border-radius: 2px; }
+      button { font-family: 'Sora', sans-serif; }
+      input, select, textarea { font-family: 'Sora', sans-serif; }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>
